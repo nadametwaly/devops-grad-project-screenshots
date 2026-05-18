@@ -1,0 +1,69 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - identity-api
+      - catalog-api
+      - order-api
+  identity-api:
+    build: ./services/identity-api 
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MySQL: "Server=mysql;Port=3306;Database=ecommerce;User=root;Password=rootpass123;"
+      Jwt__Key: "ThisIsA32CharOrLongerSuperSecretKey!2025"
+      Jwt__Issuer: ecommerce-identity
+      Jwt__Audience: ecommerce
+    depends_on:
+      mysql:
+        condition: service_healthy
+  catalog-api:
+    build: ./services/catalog-api
+    ports:
+      - "8082:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MySQL: "Server=mysql;Port=3306;Database=ecommerce;User=root;Password=rootpass123;"
+      Jwt__Key: "ThisIsA32CharOrLongerSuperSecretKey!2025"
+      Jwt__Issuer: ecommerce-identity
+      Jwt__Audience: ecommerce
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  order-api:
+    build: ./services/order-api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MySQL: "Server=mysql;Port=3306;Database=ecommerce;User=root;Password=rootpass123;"
+      Jwt__Key: "ThisIsA32CharOrLongerSuperSecretKey!2025"
+      Jwt__Issuer: ecommerce-identity
+      Jwt__Audience: ecommerce
+      CatalogApi__BaseUrl: http://catalog-api:8080
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8
+    user: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass123
+      MYSQL_DATABASE: ecommerce
+      MYSQL_ROOT_HOST: "%"   # Allows root to connect from any container (backends live elsewhere)
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:                                                                  
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-prootpass123"]    
+      interval: 10s                                                             
+      retries: 5                                                                 
+      start_period: 30s   
+
+
+volumes:
+  mysql_data:
+
